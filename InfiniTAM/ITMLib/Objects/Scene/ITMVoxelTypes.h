@@ -142,3 +142,5 @@ struct ITMVoxel_f_conf
 	}
 };
 
+//to do: 新增一个ITMVoxel_semantic类，增加语义相关属性。
+
