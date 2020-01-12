@@ -7,6 +7,8 @@
 #include "../ITMLib/Objects/Camera/ITMRGBDCalib.h"
 #include "../ITMLib/Utils/ITMImageTypes.h"
 
+#include "./DepthProvider.h"
+
 namespace InputSource {
 
 	class ImageSourceEngine
@@ -114,6 +116,11 @@ namespace InputSource {
 		ITMUChar4Image *cached_rgb;
 		ITMShortImage *cached_depth;
 
+		ITMUChar4Image *cached_rgb_right;//增加右视图cache
+
+		bool use_stereo;//是否使用双目图像作为输入
+		DepthProvider *depth_provider;//用于深度恢复计算的接口
+
 		void loadIntoCache() const;
 		mutable size_t cachedFrameNo;
 		size_t currentFrameNo;
@@ -122,7 +129,7 @@ namespace InputSource {
 		PathGenerator pathGenerator;
 	public:
 
-		ImageFileReader(const char *calibFilename, const PathGenerator& pathGenerator_, size_t initialFrameNo = 0);
+		ImageFileReader(const char *calibFilename, const PathGenerator& pathGenerator_, size_t initialFrameNo = 0, bool use_stereo_ = false);//增加参数use_stereo
 		~ImageFileReader();
 
 		bool hasMoreImages(void) const;

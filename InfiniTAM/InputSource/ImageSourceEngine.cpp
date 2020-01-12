@@ -70,10 +70,13 @@ size_t ImageListPathGenerator::imageCount() const
 	return rgbImagePaths.size();
 }
 
+//增加参数 use_stereo
 template <typename PathGenerator>
-ImageFileReader<PathGenerator>::ImageFileReader(const char *calibFilename, const PathGenerator& pathGenerator_, size_t initialFrameNo)
+ImageFileReader<PathGenerator>::ImageFileReader(const char *calibFilename, const PathGenerator& pathGenerator_, 
+												size_t initialFrameNo, bool use_stereo_)
 	: BaseImageSourceEngine(calibFilename),
-	  pathGenerator(pathGenerator_)
+	  pathGenerator(pathGenerator_),
+	  use_stereo(use_stereo_)
 {
 	currentFrameNo = initialFrameNo;
 	cachedFrameNo = -1;
@@ -81,6 +84,11 @@ ImageFileReader<PathGenerator>::ImageFileReader(const char *calibFilename, const
 	cached_rgb = new ITMUChar4Image(true, false);
 	cached_depth = new ITMShortImage(true, false);
 	cacheIsValid = false;
+
+	//用双目图像作为输入，则增加左右视图缓存空间
+	if(use_stereo){
+		cached_rgb_right = new ITMUChar4Image(true, false);//allocate cpu, not gpu2
+	}
 }
 
 template <typename PathGenerator>
@@ -88,8 +96,15 @@ ImageFileReader<PathGenerator>::~ImageFileReader()
 {
 	delete cached_rgb;
 	delete cached_depth;
+
+	//删除左右视图缓存空间
+	if(use_stereo){
+		delete cached_rgb_right;
+	}
 }
 
+//if(!use_stereo) 读入rgb图像和depth图
+//else 读入左右视图，立体匹配计算depth图
 template <typename PathGenerator>
 void ImageFileReader<PathGenerator>::loadIntoCache(void) const
 {
@@ -98,18 +113,37 @@ void ImageFileReader<PathGenerator>::loadIntoCache(void) const
 
 	cacheIsValid = true;
 
-	std::string rgbPath = pathGenerator.getRgbImagePath(currentFrameNo);
-	if (!ReadImageFromFile(cached_rgb, rgbPath.c_str()))
-	{
-		if (cached_rgb->noDims.x > 0) cacheIsValid = false;
-		printf("error reading file '%s'\n", rgbPath.c_str());
-	}
+	if(！use_stereo_){
+		std::string rgbPath = pathGenerator.getRgbImagePath(currentFrameNo);
+		if (!ReadImageFromFile(cached_rgb, rgbPath.c_str()))
+		{
+			if (cached_rgb->noDims.x > 0) cacheIsValid = false;
+			printf("error reading file '%s'\n", rgbPath.c_str());
+		}
 
-	std::string depthPath = pathGenerator.getDepthImagePath(currentFrameNo);
-	if (!ReadImageFromFile(cached_depth, depthPath.c_str()))
-	{
-		if (cached_depth->noDims.x > 0) cacheIsValid = false;
-		printf("error reading file '%s'\n", depthPath.c_str());
+		std::string depthPath = pathGenerator.getDepthImagePath(currentFrameNo);
+		if (!ReadImageFromFile(cached_depth, depthPath.c_str()))
+		{
+			if (cached_depth->noDims.x > 0) cacheIsValid = false;
+			printf("error reading file '%s'\n", depthPath.c_str());
+		}
+	}else{//这里RgbImagePath和DepthImagePath 实际分别存放左视图、右视图目录路径
+		std::string rgbPath = pathGenerator.getRgbImagePath(currentFrameNo);
+		if (!ReadImageFromFile(cached_rgb, rgbPath.c_str()))
+		{
+			if (cached_rgb->noDims.x > 0) cacheIsValid = false;
+			printf("error reading file '%s'\n", rgbPath.c_str());
+		}
+
+		std::string rgbRightPath = pathGenerator.getDepthImagePath(currentFrameNo);
+		if (!ReadImageFromFile(cached_rgb_right, rgbRightPath.c_str()))
+		{
+			if (cached_rgb_right->noDims.x > 0) cacheIsValid = false;
+			printf("error reading file '%s'\n", rgbRightPath.c_str());
+		}
+
+		//用左右视图立体匹配，获取左视图深度
+		depth_provider->computeDepthFromStereo(*cached_rgb, *cached_rgb_right, cached_depth);
 	}
 
 	if ((cached_rgb->noDims.x <= 0) && (cached_depth->noDims.x <= 0)) cacheIsValid = false;

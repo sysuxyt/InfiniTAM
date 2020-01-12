@@ -30,6 +30,10 @@ INCLUDE(${PROJECT_SOURCE_DIR}/cmake/UseRealSense.cmake)
 INCLUDE(${PROJECT_SOURCE_DIR}/cmake/UseRealSense2.cmake)
 INCLUDE(${PROJECT_SOURCE_DIR}/cmake/UseUVC.cmake)
 
+#加入elas的头文件目录
+#todo 规范化，编写UseElas.cmake文件
+INCLUDE_DIRECTORIES(${ELAS_INCLUDE_DIR})
+
 #############################
 # Specify the project files #
 #############################
@@ -75,3 +79,9 @@ SOURCE_GROUP("" FILES ${sources} ${headers})
 ##########################################
 
 INCLUDE(${PROJECT_SOURCE_DIR}/cmake/SetCUDALibTarget.cmake)
+
+##########################################
+# 链接libelas，前提是该库已编译 #
+# todo:规范化，编写UseElas.cmake文件#
+##########################################
+TARGET_LINK_LIBRARIES(${targetname} ${ELAS_LIBRARIES})
